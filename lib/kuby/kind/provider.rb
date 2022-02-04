@@ -43,6 +43,11 @@ module Kuby
           image = image.current_version
 
           image.tags.map do |tag|
+            # Skip 'latest' because it's so darn expensive to load large images
+            # into Kind clusters. Kind doesn't seem to realize images with the
+            # same SHA but different tags are the same, :eyeroll:.
+            next if tag == ::Kuby::Docker::LATEST_TAG
+
             cmd = [
               KindRb.executable,
               'load', 'docker-image', "#{image.image_url}:#{tag}",
