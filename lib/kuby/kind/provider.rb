@@ -1,10 +1,18 @@
 require 'kuby'
 require 'kind-rb'
+require 'open3'
 
 module Kuby
   module Kind
     class Provider < ::Kuby::Kubernetes::Provider
       STORAGE_CLASS_NAME = 'default'.freeze
+      DEFAULT_EXPOSED_PORTS = [80, 443].freeze
+
+      attr_reader :config
+
+      def configure(&block)
+        config.instance_eval(&block) if block
+      end
 
       def kubeconfig_path
         File.join(
@@ -26,10 +34,25 @@ module Kuby
         load_images
       end
 
+      def after_configuration
+        if nginx_ingress = environment.kubernetes.plugin(:nginx_ingress)
+          nginx_ingress.configure do
+            provider('kind') unless provider
+          end
+        end
+      end
+
       private
 
       def after_initialize
         @already_ensured = false
+        @config = Config.new
+
+        configure do
+          DEFAULT_EXPOSED_PORTS.each do |port|
+            expose_port port
+          end
+        end
 
         kubernetes_cli.before_execute do
           ensure_cluster!
@@ -42,20 +65,16 @@ module Kuby
         environment.kubernetes.docker_images.each do |image|
           image = image.current_version
 
-          image.tags.map do |tag|
-            # Skip 'latest' because it's so darn expensive to load large images
-            # into Kind clusters. Kind doesn't seem to realize images with the
-            # same SHA but different tags are the same, :eyeroll:.
-            next if tag == ::Kuby::Docker::LATEST_TAG
+          # Only load the main tag because it's so darn expensive to load large
+          # images into Kind clusters. Kind doesn't seem to realize images with
+          # the same SHA but different tags are the same, :eyeroll:
+          cmd = [
+            KindRb.executable,
+            'load', 'docker-image', "#{image.image_url}:#{image.main_tag}",
+            '--name', cluster_name
+          ]
 
-            cmd = [
-              KindRb.executable,
-              'load', 'docker-image', "#{image.image_url}:#{tag}",
-              '--name', cluster_name
-            ]
-
-            system({ 'KUBECONFIG' => kubeconfig_path }, cmd.join(' '))
-          end
+          system(cmd.join(' '))
         end
 
         Kuby.logger.info("Docker images loaded into Kind cluster successfully.")
@@ -77,21 +96,73 @@ module Kuby
       end
 
       def recreate_cluster!
-        if cluster_defined? || cluster_running?
-          delete_cluster!
-        end
-
+        delete_cluster! if cluster_running?
         create_cluster!
       end
 
       def delete_cluster!
-        cmd = [KindRb.executable, 'delete', 'cluster', '--name', cluster_name]
-        system({ 'KUBECONFIG' => kubeconfig_path }, cmd.join(' '))
+        cmd = [
+          KindRb.executable, 'delete', 'cluster',
+          '--name', cluster_name,
+          '--kubeconfig', kubeconfig_path
+        ]
+
+        system(cmd.join(' '))
+
+        if $?.exitstatus != 0
+          raise 'Kind command failed'
+        end
       end
 
       def create_cluster!
-        cmd = [KindRb.executable, 'create', 'cluster', '--name', cluster_name]
-        system({ 'KUBECONFIG' => kubeconfig_path }, cmd.join(' '))
+        cmd = [
+          KindRb.executable, 'create', 'cluster',
+          '--name', cluster_name,
+          '--kubeconfig', kubeconfig_path,
+        ]
+
+        if (cluster_config = make_cluster_config)
+          cmd << '--config -'
+
+          Open3.pipeline_w(cmd.join(' ')) do |stdin, wait_threads|
+            stdin.puts(YAML.dump(cluster_config))
+            stdin.close
+            wait_threads.each(&:join)
+
+            if wait_threads.first.value.exitstatus != 0
+              raise 'Kind command failed'
+            end
+          end
+        else
+          system(cmd.join(' '))
+
+          if $?.exitstatus != 0
+            raise 'Kind command failed'
+          end
+        end
+      end
+
+      def make_cluster_config
+        return nil if config.exposed_ports.empty?
+
+        {
+          'kind' => 'Cluster',
+          'apiVersion' => 'kind.x-k8s.io/v1alpha4',
+          'nodes' => [{
+            'role' => 'control-plane',
+            'kubeadmConfigPatches' => [
+              <<~END,
+                kind: InitConfiguration
+                nodeRegistration:
+                  kubeletExtraArgs:
+                    node-labels: "ingress-ready=true"
+              END
+            ],
+            'extraPortMappings' => config.exposed_ports.map do |port|
+              { 'containerPort' => port, 'hostPort' => port, 'protocol' => 'TCP' }
+            end
+          }]
+        }
       end
 
       def cluster_defined?
