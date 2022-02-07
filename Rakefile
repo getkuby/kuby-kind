@@ -2,7 +2,7 @@ require 'bundler'
 require 'rspec/core/rake_task'
 require 'rubygems/package_task'
 
-require 'kuby/prebundler'
+require 'kuby/kind'
 require 'pry-byebug'
 
 Bundler::GemHelper.install_tasks
