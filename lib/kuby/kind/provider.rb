@@ -5,7 +5,7 @@ require 'open3'
 module Kuby
   module Kind
     class Provider < ::Kuby::Kubernetes::Provider
-      STORAGE_CLASS_NAME = 'default'.freeze
+      STORAGE_CLASS_NAME = 'standard'.freeze
       DEFAULT_EXPOSED_PORTS = [80, 443].freeze
 
       attr_reader :config
@@ -120,6 +120,10 @@ module Kuby
           '--name', cluster_name,
           '--kubeconfig', kubeconfig_path,
         ]
+
+        if config.kubernetes_version
+          cmd += ['--image', "kindest/node:v#{config.kubernetes_version}"]
+        end
 
         if (cluster_config = make_cluster_config)
           cmd << '--config -'
