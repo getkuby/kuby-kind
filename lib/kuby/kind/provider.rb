@@ -29,9 +29,11 @@ module Kuby
         ensure_cluster!
       end
 
-      def before_deploy(*)
+      def deploy
         ensure_cluster!
         load_images
+
+        super
       end
 
       def after_configuration
