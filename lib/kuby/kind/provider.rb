@@ -80,6 +80,10 @@ module Kuby
 
         environment.kubernetes.docker_images.each do |image|
           image = image.current_version
+
+          # Avoid loading images into the cluster if they're already there. Kind tries to detect this
+          # on its own and will even emit log messages to that effect, but appears to load them
+          # anyway. Since loading images can be quite time-consuming, we do our own check below.
           images = docker_cli.images(image.image_url, digests: true)
           image_info = images.find { |img| img[:tag] == image.main_tag }
 
@@ -96,9 +100,6 @@ module Kuby
             end
           end
 
-          # Only load the main tag because it's so darn expensive to load large
-          # images into Kind clusters. Kind doesn't seem to realize images with
-          # the same SHA but different tags are the same, :eyeroll:
           cmd = [
             KindRb.executable,
             'load', 'docker-image', "#{image.image_url}:#{image.main_tag}",
