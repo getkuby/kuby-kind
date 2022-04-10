@@ -62,10 +62,39 @@ module Kuby
       end
 
       def load_images
+        require 'pry-byebug'
         Kuby.logger.info("Loading Docker images into Kind cluster...")
+
+        node_name = "#{cluster_name}-control-plane"
+        loaded_images = YAML.load(
+          docker_cli.exec_capture(
+            container: node_name,
+            command: '/usr/local/bin/crictl images --digests -o yaml'
+          )
+        )
+
+        loaded_digests = loaded_images['images'].map do |image|
+          algo, digest = image['id'].split(':')
+          { algo: algo, digest: digest }
+        end
 
         environment.kubernetes.docker_images.each do |image|
           image = image.current_version
+          images = docker_cli.images(image.image_url, digests: true)
+          image_info = images.find { |img| img[:tag] == image.main_tag }
+
+          if image_info
+            algo, _ = image_info[:digest].split(':')
+
+            loaded_digest = loaded_digests.find do |loaded_digest|
+              algo == loaded_digest[:algo] && loaded_digest[:digest].start_with?(image_info[:id])
+            end
+
+            if loaded_digest
+              Kuby.logger.info("Skipping #{image.image_url}@#{loaded_digest[:algo]}:#{loaded_digest[:digest]} because it's already loaded.")
+              next
+            end
+          end
 
           # Only load the main tag because it's so darn expensive to load large
           # images into Kind clusters. Kind doesn't seem to realize images with
@@ -212,6 +241,10 @@ module Kuby
         @kubeconfig_dir ||= File.join(
           Dir.tmpdir, 'kuby-kind'
         )
+      end
+
+      def docker_cli
+        @docker_cli ||= Docker::CLI.new
       end
     end
   end
