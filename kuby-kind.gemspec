@@ -12,6 +12,7 @@ Gem::Specification.new do |s|
 
   s.platform = Gem::Platform::RUBY
 
+  s.add_dependency 'kuby-core', '>= 0.16.0', '< 1.0'
   s.add_dependency 'kind-rb', '~> 0.1'
 
   s.require_path = 'lib'

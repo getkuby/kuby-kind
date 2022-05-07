@@ -3,7 +3,7 @@ source 'https://rubygems.org'
 gemspec
 
 group :development, :test do
-  gem 'kuby-core', path: '../kuby-core'
+  gem 'sorbet-runtime'
   gem 'pry-byebug'
   gem 'rake'
 end

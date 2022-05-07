@@ -1,6 +1,3 @@
-## 0.3.0
-* Don't depend on kuby-core.
-
 ## 0.2.1
 * Only create cluster and load images on deploy.
   - Uses the `deploy` hook instead of `before_deploy`, which is called during `kuby resources` used to simulate a deploy so tag info is populated correctly.
