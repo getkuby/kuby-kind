@@ -1,3 +1,6 @@
+## 0.2.2
+* Add missing 'require'.
+
 ## 0.2.1
 * Only create cluster and load images on deploy.
   - Uses the `deploy` hook instead of `before_deploy`, which is called during `kuby resources` used to simulate a deploy so tag info is populated correctly.

@@ -1,6 +1,7 @@
 require 'kuby'
 require 'kind-rb'
 require 'open3'
+require 'tmpdir'
 
 module Kuby
   module Kind
