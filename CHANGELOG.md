@@ -1,3 +1,6 @@
+## 0.2.3
+* Remove mistakenly added `require 'pry-byebug'` 🤦
+
 ## 0.2.2
 * Add missing 'require'.
 

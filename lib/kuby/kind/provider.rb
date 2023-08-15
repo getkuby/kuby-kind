@@ -63,7 +63,6 @@ module Kuby
       end
 
       def load_images
-        require 'pry-byebug'
         Kuby.logger.info("Loading Docker images into Kind cluster...")
 
         node_name = "#{cluster_name}-control-plane"
