@@ -73,7 +73,9 @@ module Kuby
           )
         )
 
-        loaded_digests = loaded_images['images'].map do |image|
+        loaded_images ||= { 'images': [] }
+
+        loaded_digests = loaded_images.fetch('images', []).map do |image|
           algo, digest = image['id'].split(':')
           { algo: algo, digest: digest }
         end
