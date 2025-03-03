@@ -1,3 +1,6 @@
+## 0.2.4
+* Guard against `nil`s when fetching loaded images.
+
 ## 0.2.3
 * Remove mistakenly added `require 'pry-byebug'` 🤦
 
